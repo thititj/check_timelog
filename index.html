@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Conversation Log Visualization</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f5f5f5;
+      color: #333;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    h1, h2, h3 {
+      color: #2c3e50;
+    }
+
+    .upload-container {
+      background-color: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      margin-bottom: 30px;
+      text-align: center;
+    }
+
+    #file-upload {
+      display: none;
+    }
+
+    .upload-btn {
+      display: inline-block;
+      background-color: #3498db;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    .upload-btn:hover {
+      background-color: #2980b9;
+    }
+
+    #file-name {
+      margin-top: 10px;
+      font-style: italic;
+    }
+
+    .results {
+      display: none;
+    }
+
+    .conversation-container, .timeline-container, .summary-container {
+      background-color: white;
+      border-radius: 8px;
+      padding: 20px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+      margin-bottom: 30px;
+    }
+
+    .conversation-message {
+      margin-bottom: 15px;
+      padding: 10px 15px;
+      border-radius: 6px;
+      max-width: 80%;
+      position: relative;
+    }
+
+    .bot {
+      background-color: #e8f4f8;
+      margin-right: auto;
+      border-left: 4px solid #3498db;
+    }
+
+    .user {
+      background-color: #f0f0f0;
+      margin-left: auto;
+      border-right: 4px solid #7f8c8d;
+      text-align: right;
+    }
+
+    .message-time {
+      font-size: 0.8em;
+      color: #7f8c8d;
+      display: block;
+      margin-top: 5px;
+    }
+
+    .timeline {
+      position: relative;
+      margin: 20px 0;
+      padding-left: 30px;
+    }
+
+    .timeline::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 10px;
+      width: 2px;
+      background-color: #3498db;
+    }
+
+    .timeline-item {
+      position: relative;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+    }
+
+    .timeline-item::before {
+      content: '';
+      position: absolute;
+      left: -25px;
+      top: 4px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background-color: #3498db;
+    }
+
+    .timeline-event {
+      font-weight: bold;
+      color: #2c3e50;
+    }
+
+    .timeline-time {
+      color: #7f8c8d;
+      font-size: 0.9em;
+    }
+
+    .timeline-details {
+      margin-top: 5px;
+      font-size: 0.9em;
+    }
+
+    .chart-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      margin-top: 20px;
+    }
+
+    .chart {
+      width: 48%;
+      min-width: 300px;
+      height: 300px;
+      margin-bottom: 20px;
+    }
+
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    .summary-table th, .summary-table td {
+      border: 1px solid #ddd;
+      padding: 8px 12px;
+      text-align: left;
+    }
+
+    .summary-table th {
+      background-color: #f2f2f2;
+    }
+
+    .summary-table tr:nth-child(even) {
+      background-color: #f9f9f9;
+    }
+
+    @media (max-width: 768px) {
+      .chart {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Conversation Log Visualization</h1>
+      <p>Upload your conversation log file to visualize conversation history and analyze computation times</p>
+    </header>
+
+    <div class="upload-container">
+      <label for="file-upload" class="upload-btn">Choose Log File</label>
+      <input type="file" id="file-upload" accept=".txt,.json">
+      <div id="file-name">No file selected</div>
+      <button id="process-btn" class="upload-btn" style="margin-top: 10px; display: none;">Process File</button>
+    </div>
+
+    <div class="results" id="results">
+      <div class="conversation-container">
+        <h2>Conversation Timeline</h2>
+        <div id="conversation-history"></div>
+      </div>
+
+      <div class="timeline-container">
+        <h2>Processing Timeline</h2>
+        <div id="event-timeline" class="timeline"></div>
+      </div>
+
+      <div class="summary-container">
+        <h2>Computation Time Analysis</h2>
+        <div class="chart-container">
+          <div class="chart">
+            <canvas id="time-chart"></canvas>
+          </div>
+          <div class="chart">
+            <canvas id="percentage-chart"></canvas>
+          </div>
+        </div>
+        <h3>Summary by Event Type</h3>
+        <table class="summary-table" id="summary-table">
+          <thead>
+            <tr>
+              <th>Event Type</th>
+              <th>Count</th>
+              <th>Total Time (sec)</th>
+              <th>Average Time (sec)</th>
+              <th>Percentage</th>
+            </tr>
+          </thead>
+          <tbody id="summary-body">
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.29.1/moment.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const fileUpload = document.getElementById('file-upload');
+      const fileName = document.getElementById('file-name');
+      const processBtn = document.getElementById('process-btn');
+      const results = document.getElementById('results');
+      const conversationHistory = document.getElementById('conversation-history');
+      const eventTimeline = document.getElementById('event-timeline');
+      const summaryBody = document.getElementById('summary-body');
+
+      let logData = [];
+
+      fileUpload.addEventListener('change', function(e) {
+        if (e.target.files.length > 0) {
+          fileName.textContent = e.target.files[0].name;
+          processBtn.style.display = 'inline-block';
+        } else {
+          fileName.textContent = 'No file selected';
+          processBtn.style.display = 'none';
+        }
+      });
+
+      processBtn.addEventListener('click', function() {
+        const file = fileUpload.files[0];
+        if (file) {
+          const reader = new FileReader();
+
+          reader.onload = function(e) {
+            const content = e.target.result;
+            processLogData(content);
+          };
+
+          reader.readAsText(file);
+        }
+      });
+
+      function processLogData(content) {
+        logData = [];
+
+        // Split the content by lines and parse each line as JSON
+        const lines = content.split('\n').filter(line => line.trim() !== '');
+
+        try {
+          lines.forEach(line => {
+            try {
+              const data = JSON.parse(line);
+              logData.push(data);
+            } catch (e) {
+              console.warn("Failed to parse line:", line, e);
+            }
+          });
+
+          if (logData.length === 0) {
+            throw new Error("No valid log entries found");
+          }
+
+          // Sort data by timestamp
+          logData.sort((a, b) => {
+            return new Date(a.timestamp) - new Date(b.timestamp);
+          });
+
+          // Display the results
+          displayResults();
+          results.style.display = 'block';
+
+        } catch (error) {
+          alert('Error parsing the log file: ' + error.message);
+        }
+      }
+
+      function displayResults() {
+        // Clear previous results
+        conversationHistory.innerHTML = '';
+        eventTimeline.innerHTML = '';
+        summaryBody.innerHTML = '';
+
+        // Display conversation history
+        displayConversation();
+
+        // Display event timeline
+        displayTimeline();
+
+        // Display computation time analysis
+        displayAnalysis();
+      }
+
+      function displayConversation() {
+        let conversationHtml = '';
+
+        logData.forEach(entry => {
+          if (entry.event === 'CHATBOT_PROCESS' && entry.response) {
+            const time = moment(entry.timestamp).format('HH:mm:ss');
+
+            conversationHtml += `
+              <div class="conversation-message bot">
+                <div>${entry.response}</div>
+                <span class="message-time">${time}</span>
+              </div>
+            `;
+          } else if (entry.event === 'STT_PROCESS' && entry.text) {
+            const time = moment(entry.timestamp).format('HH:mm:ss');
+
+            conversationHtml += `
+              <div class="conversation-message user">
+                <div>${entry.text}</div>
+                <span class="message-time">${time}</span>
+              </div>
+            `;
+          }
+        });
+
+        conversationHistory.innerHTML = conversationHtml;
+      }
+
+      function displayTimeline() {
+        let timelineHtml = '';
+
+        logData.forEach(entry => {
+          const time = moment(entry.timestamp).format('HH:mm:ss');
+          let details = '';
+
+          if (entry.computation_time) {
+            details += `Computation time: ${entry.computation_time.toFixed(2)}s<br>`;
+          }
+
+          if (entry.event === 'CHATBOT_PROCESS' && entry.response) {
+            details += `Response: "${entry.response.substring(0, 50)}${entry.response.length > 50 ? '...' : ''}"`;
+          } else if (entry.event === 'STT_PROCESS' && entry.text) {
+            details += `Text: "${entry.text}"<br>`;
+            details += `Audio duration: ${entry.audio_duration.toFixed(2)}s`;
+          } else if (entry.event === 'TTS_PROCESS') {
+            details += `Character count: ${entry.char_count}`;
+          } else if (entry.event === 'PROMPT') {
+            details += `Text: "${entry.text}"<br>`;
+            details += `Duration: ${entry.duration.toFixed(2)}s`;
+          }
+
+          timelineHtml += `
+            <div class="timeline-item">
+              <div class="timeline-event">${entry.event}</div>
+              <div class="timeline-time">${time}</div>
+              <div class="timeline-details">${details}</div>
+            </div>
+          `;
+        });
+
+        eventTimeline.innerHTML = timelineHtml;
+      }
+
+      function displayAnalysis() {
+        // Analyze computation times by event type
+        const eventCategories = {};
+        let totalTime = 0;
+
+        logData.forEach(entry => {
+          if (entry.computation_time || entry.duration) {
+            const time = entry.computation_time || entry.duration;
+            totalTime += time;
+
+            if (!eventCategories[entry.event]) {
+              eventCategories[entry.event] = {
+                count: 0,
+                totalTime: 0
+              };
+            }
+
+            eventCategories[entry.event].count++;
+            eventCategories[entry.event].totalTime += time;
+          }
+        });
+
+        // Display summary table
+        let tableHtml = '';
+
+        Object.keys(eventCategories).forEach(event => {
+          const category = eventCategories[event];
+          const avgTime = category.totalTime / category.count;
+          const percentage = (category.totalTime / totalTime * 100).toFixed(2);
+
+          tableHtml += `
+            <tr>
+              <td>${event}</td>
+              <td>${category.count}</td>
+              <td>${category.totalTime.toFixed(2)}</td>
+              <td>${avgTime.toFixed(2)}</td>
+              <td>${percentage}%</td>
+            </tr>
+          `;
+        });
+
+        // Add total row
+        tableHtml += `
+          <tr style="font-weight: bold;">
+            <td>TOTAL</td>
+            <td>${Object.values(eventCategories).reduce((sum, cat) => sum + cat.count, 0)}</td>
+            <td>${totalTime.toFixed(2)}</td>
+            <td>-</td>
+            <td>100.00%</td>
+          </tr>
+        `;
+
+        summaryBody.innerHTML = tableHtml;
+
+        // Create time distribution chart
+        createCharts(eventCategories, totalTime);
+      }
+
+      function createCharts(eventCategories, totalTime) {
+        // Prepare data for charts
+        const labels = Object.keys(eventCategories);
+        const timeData = labels.map(event => eventCategories[event].totalTime.toFixed(2));
+        const percentageData = labels.map(event => (eventCategories[event].totalTime / totalTime * 100).toFixed(2));
+
+        // Generate colors
+        const colors = generateColors(labels.length);
+
+        // Create time distribution chart
+        const timeCtx = document.getElementById('time-chart');
+        if (window.timeChart) {
+          window.timeChart.destroy();
+        }
+
+        window.timeChart = new Chart(timeCtx, {
+          type: 'bar',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Computation Time (seconds)',
+              data: timeData,
+              backgroundColor: colors
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              title: {
+                display: true,
+                text: 'Computation Time by Event Type'
+              },
+              legend: {
+                display: false
+              }
+            }
+          }
+        });
+
+        // Create percentage chart
+        const percentageCtx = document.getElementById('percentage-chart');
+        if (window.percentageChart) {
+          window.percentageChart.destroy();
+        }
+
+        window.percentageChart = new Chart(percentageCtx, {
+          type: 'pie',
+          data: {
+            labels: labels,
+            datasets: [{
+              data: percentageData,
+              backgroundColor: colors
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: {
+              title: {
+                display: true,
+                text: 'Percentage of Total Computation Time'
+              }
+            }
+          }
+        });
+      }
+
+      function generateColors(count) {
+        const baseColors = [
+          '#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6',
+          '#1abc9c', '#d35400', '#34495e', '#16a085', '#c0392b'
+        ];
+
+        // If we need more colors than in our base array, we'll generate them
+        const colors = [];
+        for (let i = 0; i < count; i++) {
+          if (i < baseColors.length) {
+            colors.push(baseColors[i]);
+          } else {
+            // Generate a random color
+            const r = Math.floor(Math.random() * 200);
+            const g = Math.floor(Math.random() * 200);
+            const b = Math.floor(Math.random() * 200);
+            colors.push(`rgb(${r}, ${g}, ${b})`);
+          }
+        }
+
+        return colors;
+      }
+    });
+  </script>
+</body>
+</html>
